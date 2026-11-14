@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Sales Analytics Dashboard</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--tx:#14182b;--mu:#5b6380;--bd:#dde2f0;--ac:#4f46e5;--code:#eef1fa;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1220;--card:#171d33;--tx:#e8ebf8;--mu:#97a0c4;--bd:#283052;--ac:#8b85ff;--code:#0f1428}}
+:root[data-theme="dark"]{--bg:#0e1220;--card:#171d33;--tx:#e8ebf8;--mu:#97a0c4;--bd:#283052;--ac:#8b85ff;--code:#0f1428}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.w{max-width:1200px;margin:0 auto;padding:16px}
+body{background:radial-gradient(900px 400px at 10% -10%,color-mix(in srgb,var(--ac) 22%,transparent),transparent),radial-gradient(700px 400px at 100% 0,color-mix(in srgb,#06b6d4 16%,transparent),transparent),var(--bg);background-attachment:fixed}
+h1{font-size:26px;margin:0;background:linear-gradient(90deg,var(--ac),#06b6d4);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:12px}.g2 .wide{grid-column:span 2}@media(max-width:760px){.g2 .wide{grid-column:span 1}}
+.g2 canvas{width:100%;height:270px;display:block;cursor:grab;touch-action:pan-y}.g2 h3{display:flex;justify-content:space-between;align-items:baseline}.g2 h3 span{font-size:11px;font-weight:400;color:var(--mu)}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}.k,.p{animation:up .6s backwards;transition:transform .15s,border-color .2s}.p:hover,.k:hover{border-color:var(--ac)}.sub{color:var(--mu);font-size:13px;margin:4px 0 14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.k{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.k small{color:var(--mu);font-size:12px}.k b{display:block;font-size:22px;margin-top:2px}
+.g{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}@media(max-width:850px){.g{grid-template-columns:1fr}}
+.p{background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(10px);border:1px solid var(--bd);border-radius:16px;padding:14px;min-width:0;box-shadow:0 8px 30px rgba(20,24,60,.08);transition:border-color .2s}
+#c{position:relative;height:420px;cursor:grab;touch-action:none}#c canvas{width:100%;height:100%;display:block}
+#tip{position:absolute;pointer-events:none;background:var(--tx);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;display:none;white-space:nowrap}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+button{font:inherit;font-size:13px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:5px 10px;cursor:pointer}
+button.on{background:var(--ac);color:#fff;border-color:var(--ac)}button:disabled{opacity:.4;cursor:not-allowed}
+.lg{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mu);margin-top:6px}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:10px;font-size:12px;overflow-x:auto;margin:8px 0;line-height:1.5}
+.out{border-left:3px solid var(--ac);padding:6px 10px;font-size:13px;background:var(--code);border-radius:0 8px 8px 0}
+h3{margin:0 0 4px;font-size:15px}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>3D Sales Analytics Dashboard</h1>
+<div class="sub">Region × Month sales for one year (simulated data, $K). Drag to rotate, scroll or pinch to zoom, hover a bar for its value.</div>
+<div class="kpis" id="kpis"></div>
+<div class="g">
+ <div class="p">
+  <div class="bar"><button id="m1" class="on">Sales</button><button id="m2">Profit</button><button id="ar">Auto-rotate: on</button></div>
+  <div id="c"><div id="tip"></div></div>
+  <div class="lg" id="lg"></div>
+ </div>
+ <div class="p">
+  <div class="bar" id="tabs"></div>
+  <div id="pane"></div>
+ </div>
+</div>
+<div class="g2">
+ <div class="p"><h3>Monthly trend + forecast <span>amber = forecast · drag</span></h3><canvas id="c1"></canvas></div>
+ <div class="p"><h3>Region share <span>of total sales</span></h3><canvas id="c2"></canvas></div>
+ <div class="p"><h3>Margin by region <span>profit / sales</span></h3><canvas id="c5"></canvas></div>
+ <div class="p wide"><h3>3D sales surface: Region × Month <span>amber peaks = high sales</span></h3><canvas id="c3"></canvas></div>
+ <div class="p"><h3>3D scatter: ad spend × sales × region <span id="rl"></span></h3><canvas id="c4"></canvas></div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ---------- data ----------
+const R=['North','South','East','West','Central'],M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COL=[0x6366f1,0x06b6d4,0x10b981,0xf59e0b,0xef4444],base=[120,95,110,85,70],mar=[.22,.18,.25,.2,.15];
+let s=7;const rnd=()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const sales=R.map((_,r)=>M.map((_,m)=>Math.round(base[r]*(1+.025*m)*(1+.2*Math.cos((m-10)*Math.PI/6))*(.9+.2*rnd()))));
+const profit=sales.map((row,r)=>row.map(v=>Math.round(v*mar[r])));
+const mt=M.map((_,m)=>sales.reduce((a,r)=>a+r[m],0));
+const ad=mt.map(v=>v*.1*(.85+.3*rnd()));
+// ---------- stats ----------
+const sum=a=>a.reduce((x,y)=>x+y,0),mean=a=>sum(a)/a.length,sd=a=>Math.sqrt(mean(a.map(v=>(v-mean(a))**2))*a.length/(a.length-1));
+const reg=(x,y)=>{const mx=mean(x),my=mean(y);const b=sum(x.map((v,i)=>(v-mx)*(y[i]-my)))/sum(x.map(v=>(v-mx)**2));const a=my-b*mx;const ss=sum(y.map((v,i)=>(v-(a+b*x[i]))**2)),st=sum(y.map(v=>(v-my)**2));return{a,b,r2:1-ss/st}};
+const corr=(x,y)=>{const mx=mean(x),my=mean(y);return sum(x.map((v,i)=>(v-mx)*(y[i]-my)))/Math.sqrt(sum(x.map(v=>(v-mx)**2))*sum(y.map(v=>(v-my)**2)))};
+const X=M.map((_,i)=>i),L=reg(X,mt),tot=sum(mt),tp=sum(profit.flat()),rt=sales.map(r=>sum(r));
+const best=rt.indexOf(Math.max(...rt)),pk=mt.indexOf(Math.max(...mt));
+const f=v=>'$'+Math.round(v).toLocaleString()+'K',fc=[12,13,14].map(i=>L.a+L.b*i);
+// ---------- KPIs ----------
+document.getElementById('kpis').innerHTML=[['Total sales',f(tot)],['Total profit',f(tp)],['Margin',(tp/tot*100).toFixed(1)+'%'],['Top region',R[best]],['Peak month',M[pk]]].map(k=>`<div class="k"><small>${k[0]}</small><b>${k[1]}</b></div>`).join('');
+document.getElementById('lg').innerHTML=R.map((r,i)=>`<span><i style="background:#${COL[i].toString(16).padStart(6,'0')}"></i>${r}</span>`).join('');
+// ---------- 3D ----------
+const box=document.getElementById('c'),tip=document.getElementById('tip');
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1,.1,100);
+const rn=new THREE.WebGLRenderer({antialias:true,alpha:true});rn.setPixelRatio(Math.min(devicePixelRatio,2));box.appendChild(rn.domElement);
+sc.add(new THREE.AmbientLight(0xffffff,.65));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(6,12,8);sc.add(dl);
+const grp=new THREE.Group();sc.add(grp);grp.rotation.set(.45,-.6,0);
+const grid=new THREE.GridHelper(14,14,0x8890b8,0x8890b8);grid.material.opacity=.3;grid.material.transparent=true;grp.add(grid);
+let dist=17;const bars=[];let metric='sales';
+function build(){bars.forEach(b=>grp.remove(b));bars.length=0;const D=metric==='sales'?sales:profit,mx=Math.max(...D.flat());
+ D.forEach((row,r)=>row.forEach((v,m)=>{const h=Math.max(.05,v/mx*6);
+  const gm=new THREE.BoxGeometry(.7,h,.9);gm.translate(0,h/2,0);const b=new THREE.Mesh(gm,new THREE.MeshLambertMaterial({color:COL[r]}));b.scale.y=.01;
+  b.position.set((m-5.5)*1.15,0,(r-2)*1.6);b.userData={t:`${R[r]} · ${M[m]}: ${f(v)}`};grp.add(b);bars.push(b)}))}
+build();
+function lbl(t,x,y,z,sz){const c=document.createElement('canvas');c.width=128;c.height=48;const g=c.getContext('2d');g.fillStyle=getComputedStyle(document.body).color;g.font='bold 28px sans-serif';g.textAlign='center';g.fillText(t,64,34);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));sp.position.set(x,y,z);sp.scale.set(sz,sz*.375,1);grp.add(sp)}
+M.forEach((m,i)=>lbl(m,(i-5.5)*1.15,-.1,4.3,1.2));R.forEach((r,i)=>lbl(r,-8.2,-.1,(i-2)*1.6,1.6));
+function size(){const w=box.clientWidth,h=box.clientHeight;rn.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',size);size();
+let auto=true,drag=false,px=0,py=0,pd=0;const pts=new Map();
+box.addEventListener('pointerdown',e=>{pts.set(e.pointerId,e);drag=true;px=e.clientX;py=e.clientY;auto=false;document.getElementById('ar').textContent='Auto-rotate: off'});
+addEventListener('pointerup',e=>{pts.delete(e.pointerId);drag=false});
+box.addEventListener('pointermove',e=>{
+ if(pts.has(e.pointerId))pts.set(e.pointerId,e);
+ if(pts.size===2){const [a,b]=[...pts.values()],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pd)dist=Math.min(30,Math.max(8,dist*pd/d));pd=d;return}pd=0;
+ if(drag){grp.rotation.y+=(e.clientX-px)*.008;grp.rotation.x=Math.min(1.5,Math.max(.05,grp.rotation.x+(e.clientY-py)*.006));px=e.clientX;py=e.clientY}
+ const r=box.getBoundingClientRect(),v=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),rc=new THREE.Raycaster();rc.setFromCamera(v,cam);
+ const h=view==='base'?rc.intersectObjects(bars)[0]:null;if(h){tip.style.display='block';tip.textContent=h.object.userData.t;tip.style.left=(e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top+12)+'px'}else tip.style.display='none'});
+box.addEventListener('wheel',e=>{e.preventDefault();dist=Math.min(30,Math.max(8,dist+e.deltaY*.01))},{passive:false});
+document.getElementById('ar').onclick=e=>{auto=!auto;e.target.textContent='Auto-rotate: '+(auto?'on':'off')};
+['m1','m2'].forEach((id,i)=>document.getElementById(id).onclick=()=>{metric=i?'profit':'sales';m1.classList.toggle('on',!i);m2.classList.toggle('on',!!i);build()});
+(function loop(){requestAnimationFrame(loop);if(auto&&!drag)grp.rotation.y+=.003;bars.forEach(b=>{if(b.scale.y<1)b.scale.y=Math.min(1,b.scale.y+.03+(1-b.scale.y)*.08)});cam.position.set(0,dist*.35,dist);cam.lookAt(0,1.5,0);rn.render(sc,cam)})();
+// ---------- alternate 3D scene per technology ----------
+let view='base';const alts={},cap=document.querySelector('.sub'),capO=cap.textContent;
+const M3=(c,o)=>new THREE.MeshStandardMaterial({color:c,roughness:.45,metalness:.15,transparent:!!o&&o<1,opacity:o||1});
+const bx=(g,w,h,d,x,y,z,c,o)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M3(c,o));m.position.set(x,y,z);g.add(m);return m};
+const lb=(g,t,x,y,z,k)=>{const c=document.createElement('canvas');c.width=512;c.height=64;const q=c.getContext('2d');q.fillStyle=getComputedStyle(document.body).color;q.font='bold 30px sans-serif';q.textAlign='center';q.fillText(t,256,44);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));s.position.set(x,y,z);s.scale.set(k*8,k,1);g.add(s)};
+const fl=g=>{const x=new THREE.GridHelper(16,16,0x8890b8,0x8890b8);x.material.transparent=true;x.material.opacity=.25;g.add(x)};
+const tb=(g,p,r,c)=>g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(p),40,r,8),M3(c)));
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z),mxS=Math.max(...sales.flat());
+function A(n,fn){const g=new THREE.Group();g.userData.alt=true;g.visible=false;fn(g);grp.add(g);alts[n]=g}
+const QC=[0x6366f1,0x06b6d4,0x10b981,0xf59e0b],qs=(r,q)=>sum(sales[r].slice(q*3,q*3+3));
+A('Pandas',g=>{const k=6/Math.max(...rt);fl(g);R.forEach((r,i)=>{let y=0;for(let q=0;q<4;q++){const h=qs(i,q)*k;bx(g,1.3,h,1.3,(i-2)*2.2,y+h/2,0,QC[q]);y+=h}lb(g,R[i],(i-2)*2.2,-.5,1.6,.6)});QC.forEach((c,q)=>{bx(g,.4,.4,.4,8,5-q*.8,0,c);lb(g,'Q'+(q+1),9.2,5-q*.8,0,.5)});lb(g,'df.groupby(region, quarter).sum()',0,7.6,0,.8)});
+A('NumPy',g=>{const T=[sales,profit,sales.map((r,i)=>r.map((v,m)=>v-profit[i][m]))];T.forEach((t,k)=>{const mx=Math.max(...t.flat());t.forEach((row,r)=>row.forEach((v,m)=>{const q=v/mx,s=.3+.7*q;bx(g,.6*s,.6*s,.6*s,(m-5.5)*.75,(r-2)*.75+3,(k-1)*1.6,new THREE.Color().setHSL(.62-.55*q,.7,.5))}));lb(g,['sales','profit','cost'][k],-5.4,.7,(k-1)*1.6,.55)});lb(g,'ndarray shape (3, 5, 12)',0,6.6,0,.8);lb(g,'axis 1: region   axis 2: month',0,.2,3.4,.5)});
+A('Statistics',g=>{const v=sales.flat(),mu=mean(v),s=sd(v),lo=Math.min(...v),hi=Math.max(...v),nb=10,w=(hi-lo)/nb,c=Array(nb).fill(0);v.forEach(x=>c[Math.min(nb-1,Math.floor((x-lo)/w))]++);const mc=Math.max(...c),X=x=>(x-lo)/(hi-lo)*12-6,e=x=>60*w/(s*Math.sqrt(2*Math.PI))*Math.exp(-.5*((x-mu)/s)**2)/mc*4;fl(g);
+ c.forEach((n,i)=>{const h=n/mc*4+.05;bx(g,1.02,h,1.4,X(lo+w*(i+.5)),h/2,0,0x6366f1,.85)});const p=[];for(let i=0;i<=60;i++){const x=lo+(hi-lo)*i/60;p.push(V3(X(x),e(x),.9))}tb(g,p,.07,0xf59e0b);
+ bx(g,X(mu+s)-X(mu-s),4.8,1.6,X(mu),2.4,0,0xf59e0b,.12);bx(g,.05,5,1.6,X(mu),2.5,0,0xef4444);lb(g,'mean '+f(mu)+'  std '+f(s),0,5.8,0,.7);lb(g,'Distribution of 60 region-month sales',0,-.6,2.2,.6)});
+A('ML',g=>{fl(g);const Xp=m=>(m-5.5)*.9,Y=v=>v/mxS*5;sales.forEach((row,r)=>row.forEach((v,m)=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.14,12,12),M3(COL[r]));s.position.set(Xp(m),Y(v),(r-2)*1.2);g.add(s)}));
+ const a=m=>Y((L.a+L.b*m)/5),pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute([Xp(0),a(0),-3.2,Xp(14),a(14),-3.2,Xp(14),a(14),3.2,Xp(0),a(0),3.2],3));pg.setIndex([0,1,2,0,2,3]);pg.computeVertexNormals();
+ g.add(new THREE.Mesh(pg,new THREE.MeshStandardMaterial({color:0xf59e0b,transparent:true,opacity:.3,side:2})));[12,13,14].forEach(m=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.25,16,16),M3(0xf59e0b));s.position.set(Xp(m),a(m),0);g.add(s)});lb(g,'LinearRegression: R2 = '+L.r2.toFixed(2)+'  (amber = forecast)',0,6.4,0,.7)});
+A('SQL',g=>{fl(g);[['orders',-5,1,0,0x6366f1],['regions',0,3.2,-2.5,0x06b6d4],['products',5,1,0,0x10b981]].forEach(t=>{bx(g,3,.5,2,t[1],t[2],t[3],t[4]);lb(g,t[0],t[1],t[2]+.9,t[3],.7)});tb(g,[V3(-5,1,0),V3(-2.5,2.2,-1.3),V3(0,3.2,-2.5)],.06,0xf59e0b);tb(g,[V3(-5,1,0),V3(0,1,.8),V3(5,1,0)],.06,0xf59e0b);
+ const o=R.map((_,i)=>i).sort((a,b)=>rt[b]-rt[a]),k=3/rt[o[0]];o.forEach((r,i)=>{const h=rt[r]*k,x=(i-2)*1.7;bx(g,1,h,1,x,h/2,4,COL[r]);lb(g,'#'+(i+1)+' '+R[r],x,h+.5,4,.5)});lb(g,'SELECT ... GROUP BY region ORDER BY total',0,5.8,-2.5,.7)});
+A('Excel',g=>{const G=0x217346;fl(g);sales.forEach((row,r)=>row.forEach((v,m)=>{const q=v/mxS;bx(g,.62,.15+q*1.5,.9,(m-5.5)*.7,(.15+q*1.5)/2,(r-2)*1.05,new THREE.Color().setHSL(.38,.55,.85-.5*q))}));M.forEach((m,i)=>{bx(g,.62,.2,.5,(i-5.5)*.7,.1,-3.1,G);lb(g,m,(i-5.5)*.7,.6,-3.1,.4)});R.forEach((r,i)=>{bx(g,1.4,.2,.9,-5.6,.1,(i-2)*1.05,G);lb(g,r,-5.6,.6,(i-2)*1.05,.4)});lb(g,'PivotTable + conditional formatting',0,3.6,0,.8)});
+A('Power BI',g=>{const Y=0xf2c811,D=0x252a3a;bx(g,11,.25,6,0,0,0,D);[[-3.4,'Sales',f(tot),1.2],[0,'Margin',(tp/tot*100).toFixed(1)+'%',0],[3.4,'Peak',M[pk],1.2]].forEach(c=>{bx(g,2.8,1.4,.25,c[0],4.2,c[3],D);bx(g,2.8,.1,.3,c[0],3.55,c[3],Y);lb(g,c[1],c[0],4.7,c[3]+.3,.45);lb(g,c[2],c[0],4.1,c[3]+.3,.7)});
+ const k=2.6/Math.max(...mt);mt.forEach((v,i)=>bx(g,.35,v*k,.5,(i-5.5)*.5-2,.12+v*k/2,0,Y));const q=Math.min(1,tp/tot/.3),t1=new THREE.Mesh(new THREE.TorusGeometry(1.1,.2,16,60),M3(0x3a4056)),t2=new THREE.Mesh(new THREE.TorusGeometry(1.1,.22,16,60,q*Math.PI*2),M3(Y));[t1,t2].forEach(t=>{t.rotation.x=-Math.PI/2;t.position.set(3.8,.3,0);g.add(t)});lb(g,'Margin vs 30% target',3.8,1.6,0,.4);lb(g,'Power BI report canvas (DAX)',0,6,0,.8)});
+A('Tableau',g=>{const mq=Math.max(...R.flatMap((_,r)=>[0,1,2,3].map(q=>qs(r,q))));R.forEach((r,i)=>{const a=i/5*Math.PI*2,cx=Math.cos(a)*3.6,cz=Math.sin(a)*3.6;for(let q=0;q<4;q++){const v=qs(i,q),rad=.3+.75*Math.sqrt(v/mq),b=q/4*Math.PI*2,s=new THREE.Mesh(new THREE.SphereGeometry(rad,24,24),M3(COL[i],.85));s.position.set(cx+Math.cos(b)*1.5,rad+.2,cz+Math.sin(b)*1.5);g.add(s)}lb(g,R[i],cx,3.1,cz,.6)});fl(g);lb(g,'Packed bubbles: Region x Quarter',0,5.2,0,.8)});
+const CD={Pandas:'groupby view: quarterly totals stacked per region.',NumPy:'the sales, profit and cost matrices as a 3D ndarray.',Statistics:'histogram of 60 region-month values with a fitted normal curve.',ML:'3D regression plane with forecast points.',SQL:'schema joins and the ranked GROUP BY result.',Excel:'pivot table grid with conditional formatting.','Power BI':'report canvas with KPI cards, column chart and gauge.',Tableau:'packed bubbles sized by sales.'};
+function setView(n){view=alts[n]?n:'base';grp.children.forEach(o=>o.visible=o.userData.alt?o===alts[view]:view==='base');m1.disabled=m2.disabled=view!=='base';cap.textContent=view==='base'?capO:n+' 3D view: '+CD[n]+' Drag to rotate.'}
+// ---------- tool tabs ----------
+const T=[
+['Pandas',`df = pd.read_csv("sales.csv", parse_dates=["date"])
+df["month"] = df.date.dt.month
+pivot = df.pivot_table(index="region",
+        columns="month", values="sales", aggfunc="sum")
+pivot.sum(axis=1).sort_values(ascending=False)`,`Region totals: ${R.map((r,i)=>r+' '+f(rt[i])).join(', ')}. ${R[best]} leads with ${(rt[best]/tot*100).toFixed(1)}% of sales.`],
+['NumPy',`m = pivot.to_numpy()          # 5 x 12 matrix
+monthly = m.sum(axis=0)
+x = np.arange(12)
+slope, icpt = np.polyfit(x, monthly, 1)
+np.corrcoef(ad_spend, monthly)[0, 1]`,`Trend slope = ${f(L.b)} per month; correlation of ad spend and sales = ${corr(ad,mt).toFixed(2)}.`],
+['Matplotlib',`fig = plt.figure(figsize=(9, 6))
+ax = fig.add_subplot(projection="3d")
+X, Y = np.meshgrid(range(12), range(5))
+ax.bar3d(X.ravel(), Y.ravel(), 0, .8, .8,
+         m.ravel(), shade=True)
+ax.set_xlabel("Month"); ax.set_ylabel("Region")`,`This dashboard’s 3D bars are the same Region × Month × Sales surface that bar3d draws, here rendered interactively with Three.js.`],
+['Statistics',`monthly.mean(), monthly.std(ddof=1)
+cv = monthly.std(ddof=1) / monthly.mean()
+stats.pearsonr(ad_spend, monthly)
+stats.f_oneway(*[m[i] for i in range(5)])  # ANOVA`,`Mean monthly sales ${f(mean(mt))}, std ${f(sd(mt))}, coefficient of variation ${(sd(mt)/mean(mt)*100).toFixed(1)}%. Correlation with ad spend is r = ${corr(ad,mt).toFixed(2)}.`],
+['ML',`from sklearn.linear_model import LinearRegression
+X = np.arange(12).reshape(-1, 1)
+model = LinearRegression().fit(X, monthly)
+model.predict([[12], [13], [14]])
+model.score(X, monthly)   # R²`,`Linear model R² = ${L.r2.toFixed(2)}. Forecast for Jan–Mar next year: ${fc.map(f).join(', ')}. A seasonal model (Prophet or SARIMA) would capture the Nov–Dec peak better.`],
+['SQL',`SELECT region, SUM(sales) AS total,
+       SUM(profit)/SUM(sales) AS margin,
+       RANK() OVER (ORDER BY SUM(sales) DESC) AS rnk
+FROM   orders
+WHERE  YEAR(order_date) = 2026
+GROUP  BY region;`,`Expected top row: ${R[best]} with ${f(rt[best])}. Margins range from ${(Math.min(...mar)*100).toFixed(0)}% (${R[mar.indexOf(Math.min(...mar))]}) to ${(Math.max(...mar)*100).toFixed(0)}% (${R[mar.indexOf(Math.max(...mar))]}).`],
+['Excel',`=SUMIFS(Data[Sales], Data[Region], A2, Data[Month], B$1)
+=FORECAST.LINEAR(13, C2:C13, B2:B13)
+=CORREL(Sales, AdSpend)
+Insert > PivotTable > Region (rows), Month (columns)`,`PivotTable gives the same 5 × 12 grid. FORECAST.LINEAR for month 13 returns about ${f(fc[0])}.`],
+['Power BI',`Total Sales = SUM(Orders[Sales])
+Margin % = DIVIDE(SUM(Orders[Profit]), [Total Sales])
+Sales LY = CALCULATE([Total Sales],
+           SAMEPERIODLASTYEAR('Date'[Date]))
+YoY % = DIVIDE([Total Sales] - [Sales LY], [Sales LY])`,`Build: Date table, then a star schema (Orders, Region, Product), a matrix visual for Region × Month, KPI cards for ${f(tot)} sales and ${(tp/tot*100).toFixed(1)}% margin, and a region slicer.`],
+['Tableau',`// Calculated fields
+Margin % = SUM([Profit]) / SUM([Sales])
+Running Sales = RUNNING_SUM(SUM([Sales]))
+// Columns: MONTH(Order Date)  Rows: Region
+// Marks: Color = SUM(Sales), Add Forecast`,`Build a highlight table (Region × Month) and a line chart with the Analytics pane forecast; peak month in this data is ${M[pk]} at ${f(mt[pk])}.`]
+];
+const tabs=document.getElementById('tabs'),pane=document.getElementById('pane');
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function show(i){setView(T[i][0]);[...tabs.children].forEach((b,j)=>b.classList.toggle('on',i===j));pane.innerHTML=`<h3>${T[i][0]}</h3><pre>${esc(T[i][1])}</pre><div class="out">${T[i][2]}</div>`}
+T.forEach((t,i)=>{const b=document.createElement('button');b.textContent=t[0];b.onclick=()=>show(i);tabs.appendChild(b)});show(0);
+// ---------- 2D charts ----------
+const cs=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim(),hx=i=>'#'+COL[i].toString(16).padStart(6,'0');
+function C(id){const c=document.getElementById(id),d=Math.min(devicePixelRatio,2),w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;const g=c.getContext('2d');g.scale(d,d);g.font='11px system-ui,sans-serif';return{g,w,h}}
+function draw(){const mu=cs('--mu'),bd=cs('--bd'),ac=cs('--ac'),tx=cs('--tx');
+ {const{g,w,h}=C('c1'),p=30,n=15,all=mt.concat(fc),mx=Math.max(...all,...X.concat([12,13,14]).map(i=>L.a+L.b*i))*1.1,mn=Math.min(...mt)*.8,px=i=>p+i*(w-p-10)/(n-1),py=v=>h-24-(v-mn)/(mx-mn)*(h-40);
+  g.strokeStyle=bd;g.fillStyle=mu;for(let k=0;k<4;k++){const v=mn+(mx-mn)*k/3,y=py(v);g.beginPath();g.moveTo(p,y);g.lineTo(w-10,y);g.stroke();g.fillText(Math.round(v),0,y+3)}
+  const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,ac+'66');gr.addColorStop(1,ac+'00');g.beginPath();g.moveTo(px(0),h-24);mt.forEach((v,i)=>g.lineTo(px(i),py(v)));g.lineTo(px(11),h-24);g.fillStyle=gr;g.fill();
+  g.beginPath();mt.forEach((v,i)=>i?g.lineTo(px(i),py(v)):g.moveTo(px(i),py(v)));g.strokeStyle=ac;g.lineWidth=2.5;g.stroke();
+  g.setLineDash([5,4]);g.strokeStyle='#f59e0b';g.beginPath();for(let i=0;i<n;i++){const y=py(L.a+L.b*i);i?g.lineTo(px(i),y):g.moveTo(px(i),y)}g.stroke();g.setLineDash([]);g.lineWidth=1;
+  g.fillStyle='#f59e0b';fc.forEach((v,i)=>{g.beginPath();g.arc(px(12+i),py(v),4,0,7);g.fill()});g.fillStyle=mu;[...M,'J+','F+','M+'].forEach((m,i)=>{if(i%2==0)g.fillText(m,px(i)-8,h-8)})}
+ {const{g,w,h}=C('c2'),cx=w*.36,cy=h/2,r=Math.min(w*.3,h/2-8);let a=-Math.PI/2;rt.forEach((v,i)=>{const e=a+v/tot*Math.PI*2;g.beginPath();g.arc(cx,cy,r,a,e);g.arc(cx,cy,r*.62,e,a,true);g.closePath();g.fillStyle=hx(i);g.fill();a=e});
+  g.fillStyle=tx;g.font='bold 16px system-ui';g.textAlign='center';g.fillText(f(tot),cx,cy+2);g.font='11px system-ui';g.fillStyle=mu;g.fillText('total',cx,cy+18);g.textAlign='left';
+  R.forEach((rn,i)=>{const y=h/2-50+i*24,x=w*.7;g.fillStyle=hx(i);g.fillRect(x,y,10,10);g.fillStyle=tx;g.fillText(rn+'  '+(rt[i]/tot*100).toFixed(1)+'%',x+16,y+9)})}
+ {const{g,w,h}=C('c3'),l=56,t=6,cw=(w-l-4)/12,ch=(h-t-22)/5,all=sales.flat(),lo=Math.min(...all),hi=Math.max(...all);
+  sales.forEach((row,r)=>{g.fillStyle=mu;g.fillText(R[r],4,t+r*ch+ch/2+4);row.forEach((v,m)=>{const q=(v-lo)/(hi-lo);g.globalAlpha=.12+.88*q;g.fillStyle=ac;g.fillRect(l+m*cw+1,t+r*ch+1,cw-2,ch-2);g.globalAlpha=1;if(cw>30){g.fillStyle=q>.55?'#fff':tx;g.fillText(v,l+m*cw+cw/2-9,t+r*ch+ch/2+4)}})});
+  g.fillStyle=mu;M.forEach((m,i)=>g.fillText(m,l+i*cw+cw/2-9,h-6))}
+ {const{g,w,h}=C('c4'),p=34,xs=ad,mx=Math.max(...xs),mi=Math.min(...xs),ym=Math.max(...mt),yi=Math.min(...mt),px=v=>p+(v-mi)/(mx-mi)*(w-p-14),py=v=>h-22-(v-yi)/(ym-yi)*(h-36),q=reg(xs,mt);
+  g.strokeStyle=bd;g.strokeRect(p,10,w-p-14,h-32);g.strokeStyle='#f59e0b';g.lineWidth=2;g.beginPath();g.moveTo(px(mi),py(q.a+q.b*mi));g.lineTo(px(mx),py(q.a+q.b*mx));g.stroke();g.lineWidth=1;
+  xs.forEach((v,i)=>{g.beginPath();g.arc(px(v),py(mt[i]),5,0,7);g.fillStyle=ac+'cc';g.fill()});g.fillStyle=mu;g.fillText('ad spend ($K)',w/2-24,h-6);document.getElementById('rl').textContent='r = '+corr(ad,mt).toFixed(2)+', R² = '+q.r2.toFixed(2)}
+ {const{g,w,h}=C('c5'),l=60,bh=(h-20)/5,mg=R.map((_,i)=>sum(profit[i])/rt[i]);R.forEach((rn,i)=>{const y=6+i*bh,bw=(w-l-50)*mg[i]/.3;g.fillStyle=mu;g.fillText(rn,4,y+bh/2+2);g.fillStyle=hx(i);g.beginPath();g.roundRect(l,y+4,bw,bh-12,6);g.fill();g.fillStyle=tx;g.fillText((mg[i]*100).toFixed(1)+'%',l+bw+6,y+bh/2+2)})}}
+// ---------- full 3D charts ----------
+const mat=c=>new THREE.MeshStandardMaterial({color:c,roughness:.45,metalness:.15}),gh=(g,n)=>{const x=new THREE.GridHelper(n,n,0x8890b8,0x8890b8);x.material.transparent=true;x.material.opacity=.3;g.add(x)};
+const sp=(g,t,x,y,z,k)=>{const c=document.createElement('canvas');c.width=256;c.height=64;const q=c.getContext('2d');q.fillStyle=cs('--tx');q.font='bold 34px sans-serif';q.textAlign='center';q.fillText(t,128,44);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));s.position.set(x,y,z);s.scale.set(k*4,k,1);g.add(s)};
+function mk(id,build,cm){const c=document.getElementById(id),rn=new THREE.WebGLRenderer({canvas:c,antialias:true,alpha:true}),s=new THREE.Scene(),cam=new THREE.PerspectiveCamera(42,1,.1,100),g=new THREE.Group();
+ rn.setPixelRatio(Math.min(devicePixelRatio,2));s.add(new THREE.AmbientLight(0xffffff,.7));const d=new THREE.DirectionalLight(0xffffff,.8);d.position.set(5,10,7);s.add(d,g);g.rotation.x=.3;build(g);cam.position.set(0,cm[0],cm[1]);cam.lookAt(0,cm[2],0);
+ let dr=false,lx=0;c.onpointerdown=e=>{dr=true;lx=e.clientX;c.setPointerCapture(e.pointerId)};c.onpointermove=e=>{if(dr){g.rotation.y+=(e.clientX-lx)*.01;lx=e.clientX}};c.onpointerup=()=>dr=false;
+ new ResizeObserver(()=>{const w=c.clientWidth,h=c.clientHeight;rn.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}).observe(c);
+ (function l(){requestAnimationFrame(l);if(!dr)g.rotation.y+=.004;rn.render(s,cam)})()}
+// 1 trend ribbon + forecast
+mk('c1',g=>{const mx=Math.max(...mt,...fc)*1.05,mn=Math.min(...mt)*.7,Y=v=>(v-mn)/(mx-mn)*4,Xp=i=>(i-7)*.8,tb=(p,r,c)=>new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(p),80,r,8),mat(c));
+ g.add(tb(mt.map((v,i)=>new THREE.Vector3(Xp(i),Y(v),0)),.07,0x6366f1));const fp=[11,12,13,14].map(i=>new THREE.Vector3(Xp(i),Y(L.a+L.b*i),0));g.add(tb(fp,.06,0xf59e0b));
+ mt.forEach((v,i)=>{const h=Y(v),b=new THREE.Mesh(new THREE.BoxGeometry(.5,h,.9),new THREE.MeshStandardMaterial({color:0x6366f1,transparent:true,opacity:.28}));b.position.set(Xp(i),h/2,0);g.add(b)});
+ fp.slice(1).forEach(p=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.14,16,16),mat(0xf59e0b));s.position.copy(p);g.add(s)});gh(g,13)},[4,12,1.8]);
+// 2 extruded donut
+mk('c2',g=>{const o=new THREE.Group();o.rotation.x=-Math.PI/2;g.add(o);let a=0;rt.forEach((v,i)=>{const e=a+v/tot*Math.PI*2,sh=new THREE.Shape(),mid=(a+e)/2;sh.absarc(0,0,3,a,e,false);sh.absarc(0,0,1.7,e,a,true);
+  const m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:i===best?1.2:.8,bevelEnabled:false}),mat(COL[i]));if(i===best)m.position.set(Math.cos(mid)*.3,Math.sin(mid)*.3,0);o.add(m);sp(g,R[i]+' '+(v/tot*100).toFixed(0)+'%',Math.cos(mid)*4,1.6,-Math.sin(mid)*4,.7);a=e})},[7,10,.3]);
+// 3 surface
+mk('c3',g=>{const hi=Math.max(...sales.flat()),pl=new THREE.PlaneGeometry(12,5,11,4),ps=pl.attributes.position,cl=[],a=new THREE.Color(0x6366f1),b=new THREE.Color(0xf59e0b);
+ for(let i=0;i<ps.count;i++){const q=sales[Math.floor(i/12)][i%12]/hi,c=a.clone().lerp(b,q);ps.setZ(i,q*3);cl.push(c.r,c.g,c.b)}
+ pl.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));pl.computeVertexNormals();const o=new THREE.Group();o.rotation.x=-Math.PI/2;
+ o.add(new THREE.Mesh(pl,new THREE.MeshStandardMaterial({vertexColors:true,side:2,roughness:.5})),new THREE.Mesh(pl,new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.25})));g.add(o);
+ M.forEach((m,i)=>sp(g,m,-6+i*12/11,0,3.3,.6));R.forEach((r,i)=>sp(g,r,-7.6,0,-2.5+i*1.25,.6))},[7,12,1]);
+// 4 scatter
+mk('c4',g=>{const P=[];sales.forEach((row,r)=>row.forEach(v=>P.push({r,x:v*.1*(.85+.3*rnd()),y:v})));const xs=P.map(p=>p.x),ys=P.map(p=>p.y),a=Math.min(...xs),b=Math.max(...xs),c=Math.min(...ys),d=Math.max(...ys);
+ P.forEach(p=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.14,12,12),mat(COL[p.r]));s.position.set((p.x-a)/(b-a)*8-4,(p.y-c)/(d-c)*4,(p.r-2)*1.3);g.add(s)});gh(g,10);
+ document.getElementById('rl').textContent='r = '+corr(xs,ys).toFixed(2)+' (60 points)'},[4,12,1.8]);
+// 5 margin cylinders
+mk('c5',g=>{R.forEach((r,i)=>{const mg=sum(profit[i])/rt[i],h=mg/.3*4,c=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,h,32),mat(COL[i])),x=(i-2)*1.7;c.position.set(x,h/2,0);g.add(c);sp(g,(mg*100).toFixed(1)+'%',x,h+.5,0,.6);sp(g,r,x,-.4,1.1,.55)});gh(g,10)},[4,10,1.8]);
+// 3D tilt on cards
+document.querySelectorAll('.k,.g2 .p').forEach(e=>{e.onpointermove=v=>{const r=e.getBoundingClientRect(),x=(v.clientX-r.left)/r.width-.5,y=(v.clientY-r.top)/r.height-.5;e.style.transform=`perspective(900px) rotateX(${-y*5}deg) rotateY(${x*7}deg)`};e.onpointerleave=()=>e.style.transform=''});
+</script>
+</body>
+</html>
